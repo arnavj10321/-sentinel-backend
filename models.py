@@ -13,6 +13,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(String(50), default="user", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -25,10 +26,11 @@ class Event(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
-    type: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
-    source: Mapped[Optional[str]] = mapped_column(String(255))
-    message: Mapped[Optional[str]] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(255), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
     severity: Mapped[str] = mapped_column(String(50), default="info", nullable=False)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(64))
+    payload: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user: Mapped[Optional["User"]] = relationship(back_populates="events")

@@ -3,6 +3,9 @@
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://sentinel:sentinel_secret@localhost:5432/sentinel"
+    secret_key: str = "change-me-in-production-use-a-long-random-string"
+    access_token_expire_minutes: int = 60
+    algorithm: str = "HS256"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
