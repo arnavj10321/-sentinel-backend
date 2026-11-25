@@ -1,3 +1,5 @@
+import base64
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -13,12 +15,28 @@ from models import User
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
+def _password_bytes(password: str) -> bytes:
+    """Derive a fixed-length bcrypt input so long passwords don't raise."""
+    return base64.b64encode(hashlib.sha256(password.encode("utf-8")).digest())
+
+
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    return bcrypt.hashpw(_password_bytes(password), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(password: str, hashed: str) -> bool:
-    return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
+    try:
+        hashed_bytes = hashed.encode("utf-8")
+        if bcrypt.checkpw(_password_bytes(password), hashed_bytes):
+            return True
+
+        # Support hashes created before SHA-256 pre-hashing was introduced.
+        raw = password.encode("utf-8")
+        if len(raw) <= 72:
+            return bcrypt.checkpw(raw, hashed_bytes)
+        return False
+    except (ValueError, TypeError):
+        return False
 
 
 def create_access_token(email: str) -> str:
@@ -45,7 +63,7 @@ def decode_access_token(token: str) -> str:
         ) from exc
 
     email = payload.get("sub")
-    if email is None:
+    if not isinstance(email, str) or not email:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token payload",
