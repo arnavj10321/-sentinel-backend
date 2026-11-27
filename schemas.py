@@ -1,5 +1,5 @@
-﻿from datetime import datetime
-from typing import Any, Optional
+from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -8,20 +8,20 @@ class EventCreate(BaseModel):
     source: str
     event_type: str
     severity: str = "info"
-    ip_address: Optional[str] = None
-    payload: Optional[dict[str, Any]] = None
+    ip_address: str | None = None
+    payload: dict[str, Any] | None = None
 
 
 class EventOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    user_id: Optional[int] = None
+    user_id: int | None = None
     source: str
     event_type: str
     severity: str
-    ip_address: Optional[str] = None
-    payload: Optional[dict[str, Any]] = None
+    ip_address: str | None = None
+    payload: dict[str, Any] | None = None
     created_at: datetime
 
 
@@ -55,10 +55,10 @@ class AuditLogOut(BaseModel):
 
     id: int
     action: str
-    user_id: Optional[int] = None
-    email: Optional[str] = None
-    ip_address: Optional[str] = None
-    details: Optional[dict[str, Any]] = None
+    user_id: int | None = None
+    email: str | None = None
+    ip_address: str | None = None
+    details: dict[str, Any] | None = None
     created_at: datetime
 
 
@@ -66,10 +66,10 @@ class AlertOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    user_id: Optional[int] = None
-    event_id: Optional[int] = None
+    user_id: int | None = None
+    event_id: int | None = None
     title: str
     status: str
     severity: str
     created_at: datetime
-    resolved_at: Optional[datetime] = None
+    resolved_at: datetime | None = None

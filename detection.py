@@ -13,16 +13,16 @@ def maybe_create_brute_force_alert(db: Session, event: Event) -> Alert | None:
 
     title = f"Brute force detected from {event.ip_address}"
     existing = (
-        db.query(Alert)
-        .filter(Alert.title == title, Alert.status == "open")
-        .first()
+        db.query(Alert).filter(Alert.title == title, Alert.status == "open").first()
     )
     if existing:
         return None
 
     failures = (
         db.query(func.count(Event.id))
-        .filter(Event.event_type == "failed_login", Event.ip_address == event.ip_address)
+        .filter(
+            Event.event_type == "failed_login", Event.ip_address == event.ip_address
+        )
         .scalar()
         or 0
     )

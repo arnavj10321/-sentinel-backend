@@ -4,17 +4,17 @@ Revision ID: d9e4f1a2b3c7
 Revises: 2786af2dde7e
 Create Date: 2026-11-27
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "d9e4f1a2b3c7"
-down_revision: Union[str, Sequence[str], None] = "2786af2dde7e"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = "2786af2dde7e"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -39,8 +39,12 @@ def upgrade() -> None:
         ),
     )
     op.create_index(op.f("ix_audit_logs_id"), "audit_logs", ["id"], unique=False)
-    op.create_index(op.f("ix_audit_logs_action"), "audit_logs", ["action"], unique=False)
-    op.create_index(op.f("ix_audit_logs_user_id"), "audit_logs", ["user_id"], unique=False)
+    op.create_index(
+        op.f("ix_audit_logs_action"), "audit_logs", ["action"], unique=False
+    )
+    op.create_index(
+        op.f("ix_audit_logs_user_id"), "audit_logs", ["user_id"], unique=False
+    )
     op.create_index(op.f("ix_audit_logs_email"), "audit_logs", ["email"], unique=False)
 
 

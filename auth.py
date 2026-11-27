@@ -1,6 +1,6 @@
 import base64
 import hashlib
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 import jwt
@@ -40,9 +40,7 @@ def verify_password(password: str, hashed: str) -> bool:
 
 
 def create_access_token(email: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.access_token_expire_minutes
-    )
+    expire = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
     return jwt.encode(
         {"sub": email, "exp": expire},
         settings.secret_key,

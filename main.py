@@ -1,4 +1,4 @@
-﻿import json
+import json
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from sqlalchemy.orm import Session
@@ -113,7 +113,9 @@ def list_models():
 def register(payload: UserCreate, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
+        )
 
     user = User(email=payload.email, hashed_password=hash_password(payload.password))
     db.add(user)
@@ -149,7 +151,9 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
             details={"reason": "inactive_user"},
         )
         db.commit()
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive"
+        )
 
     record_audit(db, "login_success", user=user, request=request)
     db.commit()
@@ -224,7 +228,11 @@ def list_audit_logs(
     query = db.query(AuditLog)
     if action:
         query = query.filter(AuditLog.action == action)
-    logs = query.order_by(AuditLog.created_at.desc(), AuditLog.id.desc()).limit(limit).all()
+    logs = (
+        query.order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+        .limit(limit)
+        .all()
+    )
     return [audit_log_to_out(log) for log in logs]
 
 
@@ -236,7 +244,9 @@ def get_event(
 ):
     event = db.query(Event).filter(Event.id == event_id).first()
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
     return event_to_out(event)
 
 
@@ -249,7 +259,9 @@ def update_event(
 ):
     event = db.query(Event).filter(Event.id == event_id).first()
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
 
     allowed = {"source", "event_type", "severity", "ip_address", "payload"}
     for field, value in payload.items():
@@ -272,7 +284,9 @@ def delete_event(
 ):
     event = db.query(Event).filter(Event.id == event_id).first()
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Event not found"
+        )
 
     db.delete(event)
     db.commit()

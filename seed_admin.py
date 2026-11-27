@@ -1,9 +1,13 @@
-﻿from database import SessionLocal
-from models import User
 from auth import hash_password
+from database import SessionLocal
+from models import User
 
 
-def seed_admin(email: str = "admin@sentinel.local", password: str = "changeme123") -> None:
+# The default password is only a local bootstrap convenience.
+def seed_admin(
+    email: str = "admin@sentinel.local",
+    password: str = "changeme123",  # nosec B107
+) -> None:
     db = SessionLocal()
     try:
         existing = db.query(User).filter(User.email == email).first()

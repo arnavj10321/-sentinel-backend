@@ -1,0 +1,17 @@
+line-length = 88
+target-version = "py313"
+
+[lint.flake8-bugbear]
+# FastAPI dependency declarations are evaluated once at import time and are
+# safe to use as default argument values.
+extend-immutable-calls = [
+    "fastapi.Body",
+    "fastapi.Cookie",
+    "fastapi.Depends",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Header",
+    "fastapi.Path",
+    "fastapi.Query",
+    "fastapi.Security",
+]

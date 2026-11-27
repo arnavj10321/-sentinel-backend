@@ -1,0 +1,3 @@
+[bandit]
+configfile = bandit.toml
+exclude = .venv,tests

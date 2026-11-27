@@ -82,7 +82,9 @@ def write_audit(
             action=action,
             user_id=user_id,
             ip_address=ip_address,
-            details=json.dumps(details) if isinstance(details, (dict, list)) else details,
+            details=json.dumps(details)
+            if isinstance(details, (dict, list))
+            else details,
         )
     )
     db.commit()
