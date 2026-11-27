@@ -1,6 +1,6 @@
 ﻿import json
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from auth import (
@@ -11,8 +11,19 @@ from auth import (
     verify_password,
 )
 from database import get_db
-from models import AuditLog, Event, User
-from schemas import AuditLogOut, EventCreate, EventOut, LoginRequest, Token, UserCreate, UserOut
+from detection import maybe_create_brute_force_alert
+from models import Alert, AuditLog, Event, User
+from schemas import (
+    AlertOut,
+    AuditLogOut,
+    EventCreate,
+    EventOut,
+    LoginRequest,
+    Token,
+    UserCreate,
+    UserOut,
+)
+from security import check_login_rate_limit, reset_login_rate_limit
 
 app = FastAPI(
     title="Sentinel API",
@@ -43,6 +54,19 @@ def audit_log_to_out(log: AuditLog) -> AuditLogOut:
         ip_address=log.ip_address,
         details=json.loads(log.details) if log.details else None,
         created_at=log.created_at,
+    )
+
+
+def alert_to_out(alert: Alert) -> AlertOut:
+    return AlertOut(
+        id=alert.id,
+        user_id=alert.user_id,
+        event_id=alert.event_id,
+        title=alert.title,
+        status=alert.status,
+        severity=alert.severity,
+        created_at=alert.created_at,
+        resolved_at=alert.resolved_at,
     )
 
 
@@ -100,6 +124,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
 
 @app.post("/auth/login", response_model=Token)
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    check_login_rate_limit(request)
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.hashed_password):
         record_audit(
@@ -128,6 +153,7 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
 
     record_audit(db, "login_success", user=user, request=request)
     db.commit()
+    reset_login_rate_limit(request)
     return Token(access_token=create_access_token(user.email))
 
 
@@ -141,7 +167,7 @@ def create_event(
     payload: EventCreate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     event = Event(
         user_id=current_user.id,
@@ -154,6 +180,9 @@ def create_event(
     db.add(event)
     db.commit()
     db.refresh(event)
+
+    maybe_create_brute_force_alert(db, event)
+
     record_audit(
         db,
         "event_created",
@@ -166,8 +195,22 @@ def create_event(
 
 
 @app.get("/events", response_model=list[EventOut])
-def list_events(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    events = db.query(Event).order_by(Event.created_at.desc()).limit(50).all()
+def list_events(
+    severity: str | None = None,
+    event_type: str | None = None,
+    ip_address: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    query = db.query(Event)
+    if severity is not None:
+        query = query.filter(Event.severity == severity)
+    if event_type is not None:
+        query = query.filter(Event.event_type == event_type)
+    if ip_address is not None:
+        query = query.filter(Event.ip_address == ip_address)
+
+    events = query.order_by(Event.created_at.desc(), Event.id.desc()).limit(50).all()
     return [event_to_out(e) for e in events]
 
 
@@ -183,3 +226,69 @@ def list_audit_logs(
         query = query.filter(AuditLog.action == action)
     logs = query.order_by(AuditLog.created_at.desc(), AuditLog.id.desc()).limit(limit).all()
     return [audit_log_to_out(log) for log in logs]
+
+
+@app.get("/events/{event_id}", response_model=EventOut)
+def get_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    return event_to_out(event)
+
+
+@app.patch("/events/{event_id}", response_model=EventOut)
+def update_event(
+    event_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    allowed = {"source", "event_type", "severity", "ip_address", "payload"}
+    for field, value in payload.items():
+        if field not in allowed:
+            continue
+        if field == "payload":
+            value = json.dumps(value) if value is not None else None
+        setattr(event, field, value)
+
+    db.commit()
+    db.refresh(event)
+    return event_to_out(event)
+
+
+@app.delete("/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    db.delete(event)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.get("/alerts", response_model=list[AlertOut])
+def list_alerts(
+    status_filter: str | None = None,
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    query = db.query(Alert)
+    if status_filter is not None:
+        query = query.filter(Alert.status == status_filter)
+
+    alerts = query.order_by(Alert.created_at.desc(), Alert.id.desc()).limit(limit).all()
+    return [alert_to_out(alert) for alert in alerts]
